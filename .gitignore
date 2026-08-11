@@ -1,0 +1,7 @@
+data/raw/
+data/interim/
+*.ckpt
+wandb/
+__pycache__/
+.venv/
+ 
