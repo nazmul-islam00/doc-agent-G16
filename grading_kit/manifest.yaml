@@ -4,23 +4,23 @@
 # ONLY this file; it points to the rest. Build/run scripts and the eval
 # tasks are NAMED here, not copied, so they never go stale.
 
-project_id: ""              # your team id
+project_id: "G16"
 
 axes:
-  domain: ""                # your corpus subject / real user (see Roster; one per team)
-  data_speciality: ""       # ONE hard property of your corpus you are handed (see Data-Speciality Catalog)
+  domain: "crop-disease-diagnosis"  # Agricultural reference assistant for crop-disease questions.
+  data_speciality: "bangla"         # Bangla scans with mixed Latin technical terminology.
                             #   e.g. bangla | arabic | code-switching | degraded-scans | multi-column |
                             #        handwritten | old-orthography | math-notation | dirty-ocr | ...
                             #   (English is not a speciality; if your corpus is English, pick a data condition.)
-  primary_nfr: ""           # ONE quality you optimise ABOVE baseline (see NFR sheet). Faithful &
+  primary_nfr: "auditable"  # Faithful and accurate remain required baseline qualities.
                             #   accurate are REQUIRED of everyone (baseline), so they are NOT choices.
-  nfr_target: ""            # the concrete target you commit to for that NFR, e.g. "p95 latency <= 300ms",
+  nfr_target: "at least 95% complete, replayable audit traces; 100% of returned answers cite evidence"
                             #   "peak RAM <= 2GB", "ECE <= 0.05", "PII recall >= 0.98"
 
 corpus:
   path: data/raw/                   # where the scanned page-images live
-  pages: 0                          # total pages  (floor: >= 300)
-  words: 0                          # total words  (floor: >= 60000)
+  pages: 403                        # total pages  (floor: >= 300)
+  words: 116539                     # total words  (floor: >= 60000)
   provenance: data/provenance.md    # source + licence + counts
 
 heldout:
