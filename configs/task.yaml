@@ -7,5 +7,5 @@ nfr_target: "at least 95% of evaluated queries produce complete, replayable audi
 corpus:
   min_pages: 300
   min_words: 60000
-  source_url: "https://old.bansdoc.gov.bd/iaeabooks/IAEA%20Books/543%20%E0%A6%B6%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A7%87%E0%A6%B0%20%E0%A6%B0%E0%A7%8B%E0%A6%97-%E0%A6%B9%E0%A6%BE%E0%A6%B8%E0%A6%BE%E0%A6%A8%20%E0%A6%86%E0%A6%B6%E0%A6%B0%E0%A6%BE%E0%A6%89%E0%A6%9C%E0%A7%8D%E0%A6%9C%E0%A6%BE%E0%A6%AE%E0%A6%BE%E0%A6%A8.pdf"
+  source_url: "https://old.bansdoc.gov.bd/iaeabooks/IAEA%20Books/543%20%E0%A6%B6%E0%A6%B8%E0%A7%8D%E0%A6%AF%E0%A7%87%E0%A6%B0%20%E0%A6%B0%E0%A7%8B%E0%A6%97-%E0%A6%B9%E0%A6%BE%E0%A6%B8%E0%A6%BE%E0%A6%A8%20%E0%A6%86%E0%A6%B6%E0%A6%B0%E0%A6%BE%E0%A6%89%E0%A6%9C%E0%A7%8D%E0%A6%9C%E0%A6%BE%E0%A6%AE%E0%A6%BE%E0%A6%A8.pdf?fbclid=IwY2xjawTCl2tleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAEwAAEeL1HZMmHUMjpsEdo6Q6_IwkkxAdQgtptBV36r-g5bzhL2LQAJrDrCJeMbz-g_aem_HuLEUtMAounrRfRT5S55MA"
   license: "Open access; Government Digital Library Repository (BANSDOC)"
