@@ -12,11 +12,13 @@
 | Validation | 1, 12, 17, 25, 32     |            57 |
 | Test       | 6, 8, 14, 23, 30      |            57 |
 
-The remaining 25 non-chapter pages are treated as auxiliary corpus pages. After the OCR/preprocessing pipeline is frozen, **all 403 pages are OCR-processed, chunked, embedded, and indexed** for the RAG system.
+The remaining 25 non-chapter pages (cover, contents, bibliography, and similar
+auxiliary material) are excluded from the knowledge-base corpus. The ingestion
+pipeline OCR-processes, chunks, embeds, and indexes the **378 chapter pages**.
+The source-corpus count remains 403 rendered scans.
 
 OCR fitting and OCR/preprocessing selection use only the training chapters; an internal development subset may be drawn from the training split when required. Validation-chapter questions are used to tune RAG/agent parameters such as retrieval, reranking, re-search, and abstention thresholds. After these choices are frozen, final QA evaluation uses questions derived from the test chapters.
 
 A **stratified manually transcribed subset of pages from the test chapters** is stored under `grading_kit/heldout_pages/`, with corresponding ground-truth records in `grading_kit/labels.jsonl`. These held-out labels are reserved for final OCR evaluation and are never used for OCR training, preprocessing selection, or hyperparameter tuning.
 
 Because the corpus contains a single source volume, a document-level split is not feasible. The chapter-grouped split is therefore used as a leakage-reduction strategy, with complete chapters kept exclusive to train, validation, or test. This constraint will be considered when interpreting the evaluation results.
-
