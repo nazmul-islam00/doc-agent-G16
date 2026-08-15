@@ -12,16 +12,31 @@ _MODEL_CACHE: dict[tuple[str, str], Any] = {}
 
 def _device(cfg: dict) -> str:
     """Select a usable torch device without requiring CUDA on every machine."""
-    requested = str(cfg.get("embed", {}).get("device", cfg.get("device", "cpu")))
-    if requested.startswith("cuda"):
-        try:
-            import torch
+    requested = str(
+        cfg.get("embed", {}).get(
+            "device",
+            cfg.get("device", "cpu"),
+        )
+    ).lower()
 
-            if torch.cuda.is_available():
-                return requested
-        except ImportError:
-            pass
+    try:
+        import torch
+    except ImportError:
+        if requested in {"auto", "cpu"}:
+            return "cpu"
         return "cpu"
+
+    if requested == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+
+    if requested.startswith("cuda"):
+        if torch.cuda.is_available():
+            return requested
+        return "cpu"
+
+    if requested == "cpu":
+        return "cpu"
+
     return requested
 
 
