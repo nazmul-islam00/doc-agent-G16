@@ -1,6 +1,6 @@
 # THE place you set models & parameters. Code reads only from here.
 seed: 42
-device: cuda
+device: auto
 
 data:
   raw_dir: data/raw/krishipath
@@ -44,12 +44,32 @@ data:
     validation: [1, 12, 17, 25, 32]
     test: [6, 8, 14, 23, 30]
 
+preprocess:
+  enabled: true
+  output_dir: data/interim/preprocessed
+  trim_left_px: 80
+  trim_border_px: 0
+  deskew: true
+  min_skew_degrees: 0.15
+  max_skew_degrees: 2.0
+
 enhance:
   enabled: false
   model: "none"
   type: "none"   # or "vae" / "none"
-layout:    {model: "detectron2:layout", score_thr: 0.5}
-ocr:       {model: "microsoft/trocr-base-printed", finetune: true}    # BASELINE = pretrained OCR
+layout:
+  model: juliozhao/DocLayout-YOLO-DocStructBench
+  weights_filename: doclayout_yolo_docstructbench_imgsz1024.pt
+  allow_download: true
+  device: auto
+  imgsz: 1024
+  score_thr: 0.2
+  reading_order: top-to-bottom
+ocr:
+  model: easyocr
+  languages: [bn, en]
+  device: auto
+  min_confidence: 0.0
 embed:     {model: "BAAI/bge-m3", dim: 1024}
 index:     {type: "faiss:hnsw", path: "data/index", chunk_tokens: 256, overlap: 32}
 retrieve:  {k: 10, k_step: 10, k_max: 40, weak_threshold: 0.35, rerank: true, reranker: "cross-encoder/ms-marco-MiniLM-L6-v2"}   # k_step/k_max/weak_threshold drive evidence-gated re-search
