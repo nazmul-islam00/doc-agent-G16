@@ -1,103 +1,114 @@
-"""Stage 3 — OCR/HTR (BASELINE = pretrained foundation, fine-tuned)"""
+"""Stage 3 -- full-page Bengali/English OCR with EasyOCR."""
+
 from __future__ import annotations
-import uuid
-import os
-from PIL import Image
-import html2text
-from surya.inference import SuryaInferenceManager
-from surya.recognition import RecognitionPredictor
-from ..contracts import *  # noqa
 
-_MANAGER_INSTANCE = None
+import logging
+import re
+import unicodedata
+from pathlib import Path
+from typing import Any
 
-def _get_manager() -> SuryaInferenceManager:
-    global _MANAGER_INSTANCE
-    if _MANAGER_INSTANCE is None:
-        _MANAGER_INSTANCE = SuryaInferenceManager()
-    return _MANAGER_INSTANCE
+import numpy as np
+from PIL import Image, ImageOps
+
+from ..contracts import Chunk, Region
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _use_gpu(requested: object) -> bool:
+    """Resolve the configured EasyOCR device."""
+    requested_text = str(requested or "auto").lower()
+    try:
+        import torch
+
+        cuda_available = torch.cuda.is_available()
+    except ImportError:
+        cuda_available = False
+    if requested_text == "auto":
+        return cuda_available
+    if requested_text.startswith("cuda") and not cuda_available:
+        LOGGER.warning("CUDA was requested for EasyOCR but is unavailable; using CPU.")
+        return False
+    return requested_text.startswith("cuda")
+
+
+def _normalise_text(text: str) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
+
 
 class Reader:
-    """Model set by cfg['ocr']. Baseline: pretrained TrOCR/Donut/Tesseract."""
+    """EasyOCR reader configured for Bengali and English."""
+
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg.get("ocr", {})
-        self.predictor = RecognitionPredictor(_get_manager())
-        self.html_parser = html2text.HTML2Text()
-        self.html_parser.body_width = 0
+        languages = self.cfg.get("languages", ["bn", "en"])
+        if not isinstance(languages, list) or not all(isinstance(item, str) for item in languages):
+            raise ValueError("ocr.languages must be a list of EasyOCR language codes.")
+        self.languages = languages
+        self.gpu = _use_gpu(self.cfg.get("device", cfg.get("device", "auto")))
+        self.min_confidence = float(self.cfg.get("min_confidence", 0.0))
+        try:
+            import easyocr
+        except ImportError as exc:
+            raise ImportError(
+                "Install the vision dependencies with `uv sync` before running OCR."
+            ) from exc
+        self._reader = easyocr.Reader(self.languages, gpu=self.gpu, verbose=False)
+
+    def read_page(self, image_path: str) -> list[dict[str, Any]]:
+        """Read text in a page image."""
+        with Image.open(image_path) as source:
+            image = np.asarray(ImageOps.exif_transpose(source).convert("RGB"))
+        lines: list[dict[str, Any]] = []
+        for box, text, confidence in self._reader.readtext(image, detail=1, paragraph=False):
+            cleaned = _normalise_text(str(text))
+            if not cleaned or float(confidence) < self.min_confidence:
+                continue
+            xs = [float(point[0]) for point in box]
+            ys = [float(point[1]) for point in box]
+            lines.append(
+                {
+                    "bbox": (min(xs), min(ys), max(xs), max(ys)),
+                    "text": cleaned,
+                }
+            )
+        return sorted(lines, key=lambda line: (line["bbox"][1], line["bbox"][0]))
 
     def transcribe_region(self, region: Region) -> str:
-        """Legacy block fallback. Unused when running full-page contextual OCR."""
+        """Return region text."""
+        del region
         return ""
 
+
 def transcribe(regions: list[Region], cfg: dict) -> list[Chunk]:
-    """Regions -> text chunks. IMPLEMENT (calls Reader)."""
+    """OCR source pages referenced by the detected regions."""
     if not regions:
         return []
+    page_map = cfg.get("_page_map", {})
+    if not isinstance(page_map, dict):
+        raise ValueError("Layout stage did not provide the page metadata needed for OCR.")
 
     reader = Reader(cfg)
     chunks: list[Chunk] = []
-    
-    # Retrieve the metadata cache passed from layout.py
-    page_map = cfg.get("page_map", {})
-    
-    # Group regions by page to run full-page OCR instead of block OCR
-    regions_by_page = set(r.page_id for r in regions)
-
-    for page_id in regions_by_page:
-        page_data = page_map.get(page_id, {})
-        image_path = page_data.get("image_path")
-        doc_id = page_data.get("doc_id", "unknown_doc")
-        
-        if not image_path or not os.path.exists(image_path):
+    for page_id in dict.fromkeys(region.page_id for region in regions):
+        page_data = page_map.get(page_id)
+        if not isinstance(page_data, dict):
+            LOGGER.warning("No source metadata was found for page %s; skipping OCR.", page_id)
             continue
-            
-        image = Image.open(image_path).convert("RGB")
-        
-        # Run full-page OCR to preserve global context
-        ocr_preds = reader.predictor([image])
-        if not ocr_preds or not ocr_preds[0].blocks:
+        image_path = Path(str(page_data.get("image_path", "")))
+        if not image_path.is_file():
+            LOGGER.warning("Source image for page %s does not exist: %s", page_id, image_path)
             continue
-            
-        result = ocr_preds[0]
-        
-        processed_blocks = []
-        for block in result.blocks:
-            if hasattr(block, 'polygon') and block.polygon:
-                xs = [pt[0] for pt in block.polygon]
-                ys = [pt[1] for pt in block.polygon]
-                bbox = [min(xs), min(ys), max(xs), max(ys)]
-            else:
-                bbox = getattr(block, 'bbox', [0,0,0,0])
-            processed_blocks.append({"block": block, "bbox": bbox})
-            
-        # Recalculate 2-column layout natively 
-        all_x_mins = [item["bbox"][0] for item in processed_blocks if item["bbox"][2] > 0]
-        all_x_maxs = [item["bbox"][2] for item in processed_blocks if item["bbox"][2] > 0]
-        page_midpoint = (min(all_x_mins) + max(all_x_maxs)) / 2.0 if all_x_mins else image.width / 2.0
-        
-        left_column, right_column = [], []
-        for item in processed_blocks:
-            center_x = (item["bbox"][0] + item["bbox"][2]) / 2.0
-            if center_x < page_midpoint:
-                left_column.append(item)
-            else:
-                right_column.append(item)
-                
-        left_column.sort(key=lambda x: x["bbox"][1])
-        right_column.sort(key=lambda x: x["bbox"][1])
-        sorted_items = left_column + right_column
-
-        # Map the sorted texts to Chunk objects strictly following the contract
-        for item in sorted_items:
-            raw_html = item["block"].html if item["block"].html else ""
-            clean_text = reader.html_parser.handle(raw_html).strip() if raw_html else ""
-            
-            if clean_text:
-                chunk = Chunk(
-                    id=str(uuid.uuid4()),
-                    doc_id=doc_id,
-                    text=clean_text,
-                    page_ids=[page_id]
+        text = "\n".join(line["text"] for line in reader.read_page(str(image_path)))
+        text = _normalise_text(text)
+        if text:
+            chunks.append(
+                Chunk(
+                    id=f"{page_id}_ocr",
+                    doc_id=str(page_data.get("doc_id", "unknown_doc")),
+                    text=text,
+                    page_ids=[page_id],
                 )
-                chunks.append(chunk)
-
+            )
     return chunks
