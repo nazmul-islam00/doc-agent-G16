@@ -1,6 +1,6 @@
 # THE place you set models & parameters. Code reads only from here.
 seed: 42
-device: auto
+device: cuda
 
 data:
   raw_dir: data/raw/krishipath
@@ -61,14 +61,14 @@ layout:
   model: juliozhao/DocLayout-YOLO-DocStructBench
   weights_filename: doclayout_yolo_docstructbench_imgsz1024.pt
   allow_download: true
-  device: auto
+  device: cuda
   imgsz: 1024
   score_thr: 0.2
   reading_order: top-to-bottom
 ocr:
   model: easyocr
   languages: [bn, en]
-  device: auto
+  device: cuda
   min_confidence: 0.0
 embed:     {model: "BAAI/bge-m3", dim: 1024}
 index:     {type: "faiss:hnsw", path: "data/index", chunk_tokens: 256, overlap: 32}
