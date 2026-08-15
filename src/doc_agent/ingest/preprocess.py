@@ -3,7 +3,6 @@
 The raw corpus is never modified. This stage writes derived PNGs and returns
 ``Page`` objects which retain their original stable IDs and document IDs.
 """
-
 from __future__ import annotations
 
 import logging
@@ -45,7 +44,9 @@ def _estimate_skew_degrees(gray: np.ndarray) -> float | None:
     if centre.size == 0:
         return None
 
-    _, foreground = cv2.threshold(centre, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    _, foreground = cv2.threshold(
+        centre, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+    )
     coordinates = cv2.findNonZero(foreground)
     if coordinates is None or len(coordinates) < 100:
         return None
@@ -88,15 +89,8 @@ def _trim_border(image: np.ndarray, margin: int) -> np.ndarray:
     return image[margin : height - margin, margin : width - margin]
 
 
-def _normalize_background(gray: np.ndarray, paper_min_median: float) -> np.ndarray:
-    """Flatten uneven/yellow paper illumination while keeping fine ink strokes.
-
-    Dark covers and illustration pages are not paper-like, so background
-    division would invert or flatten their useful colour contrast. They are
-    deliberately left as ordinary grayscale pages.
-    """
-    if float(np.median(gray)) < paper_min_median:
-        return gray
+def _normalize_background(gray: np.ndarray) -> np.ndarray:
+    """Flatten uneven/yellow paper illumination while keeping fine ink strokes."""
     background = cv2.GaussianBlur(gray, (0, 0), sigmaX=35, sigmaY=35)
     background = np.maximum(background, 1)
     normalized = cv2.divide(gray, background, scale=255)
@@ -125,7 +119,7 @@ def _preprocess_image(image: np.ndarray, settings: dict) -> np.ndarray:
     if settings["denoise"]:
         gray = cv2.fastNlMeansDenoising(gray, None, h=5, templateWindowSize=7, searchWindowSize=21)
     if settings["normalize_background"]:
-        gray = _normalize_background(gray, settings["paper_min_median"])
+        gray = _normalize_background(gray)
     if settings["binarize"]:
         if settings["binarize_method"] == "otsu":
             _, gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -154,7 +148,6 @@ def _settings(cfg: dict) -> dict:
         "min_page_area_ratio": float(configured.get("min_page_area_ratio", 0.55)),
         "denoise": bool(configured.get("denoise", True)),
         "normalize_background": bool(configured.get("normalize_background", True)),
-        "paper_min_median": float(configured.get("paper_min_median", 160.0)),
         "binarize": bool(configured.get("binarize", False)),
         "binarize_method": str(configured.get("binarize_method", "adaptive")).lower(),
     }
