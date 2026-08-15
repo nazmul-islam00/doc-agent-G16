@@ -1,4 +1,4 @@
-"""Tests for page-level corpus and split validation."""
+"""Tests for corpus validation and deterministic version snapshots."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import pytest
 
 from doc_agent.contracts import Page
 from doc_agent.data import validate as validation
+from doc_agent.data.versioning import snapshot
 
 
 def _set_validation_config(
@@ -110,3 +111,42 @@ def test_validate_rejects_overlapping_chapter_split_assignments(
     )
     with pytest.raises(ValueError, match="both 'train' and 'validation' splits"):
         validation.validate([_page(tmp_path / "page-0001.png")])
+
+
+def test_snapshot_is_stable_for_unchanged_corpus(tmp_path: Path) -> None:
+    corpus_dir = tmp_path / "corpus"
+    first = corpus_dir / "chapter-01" / "page-0001.txt"
+    second = corpus_dir / "chapter-02" / "page-0002.txt"
+    first.parent.mkdir(parents=True)
+    second.parent.mkdir(parents=True)
+    first.write_bytes(b"first page")
+    second.write_bytes(b"second page")
+
+    first_hash = snapshot(str(corpus_dir))
+    second_hash = snapshot(str(corpus_dir))
+
+    assert first_hash == second_hash
+    assert first_hash.startswith("sha256:")
+    assert len(first_hash) == len("sha256:") + 64
+
+
+def test_snapshot_changes_when_corpus_content_changes(tmp_path: Path) -> None:
+    corpus_dir = tmp_path / "corpus"
+    corpus_dir.mkdir()
+    page = corpus_dir / "page-0001.txt"
+    page.write_bytes(b"original text")
+    original_hash = snapshot(str(corpus_dir))
+
+    page.write_bytes(b"revised text")
+
+    assert snapshot(str(corpus_dir)) != original_hash
+
+
+def test_snapshot_rejects_missing_or_empty_corpus(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        snapshot(str(tmp_path / "missing"))
+
+    empty_corpus = tmp_path / "empty"
+    empty_corpus.mkdir()
+    with pytest.raises(ValueError, match="contains no files"):
+        snapshot(str(empty_corpus))
